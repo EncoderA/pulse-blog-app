@@ -1,1 +1,10 @@
-hi
+fastapi
+uvicorn
+sqlmodel
+psycopg2-binary
+alembic
+python-jose
+python-dotenv
+httpx
+pydantic-settings
+apscheduler
