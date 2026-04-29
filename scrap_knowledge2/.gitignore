@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+vnv/
+
+# Environment / secrets
+.env
+.env.*
+
+# Local databases / artifacts
+*.sqlite
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Docker local overrides
+docker-compose.override.yml
