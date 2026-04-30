@@ -1,0 +1,39 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_SSH_PORT || 22 }}
+          envs: FRONTEND_ENV,SCRAP_ENV
+          script: |
+            set -e
+            if [ ! -d "pulse-blog-app" ]; then
+              git clone https://github.com/${{ github.repository }}.git
+            fi
+            cd pulse-blog-app
+            git pull origin main
+            printf "%s" "$FRONTEND_ENV" > frontend/.env
+            printf "%s" "$SCRAP_ENV" > scrap_knowledge2/.env
+            docker compose up -d --build
+        env:
+          FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
+          SCRAP_ENV: ${{ secrets.SCRAP_ENV }}
