@@ -10,7 +10,6 @@ services:
       - frontend
       - scrap-knowledge2
 
-  services:
   backend:
     build: ./backend
     container_name: backend_service
