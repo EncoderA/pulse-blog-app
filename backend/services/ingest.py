@@ -2,6 +2,7 @@ import httpx
 from sqlmodel import Session, select
 from models.post import Post
 from core.config import settings
+import uuid
 
 # ── PLACEHOLDERS ────────────────────────────────────────────────────────
 # 1. Replace EXTERNAL_API_URL and EXTERNAL_API_KEY in .env once available
@@ -23,21 +24,15 @@ def map_to_post(raw: dict) -> Post:
     Map raw external post to local Post model.
     """
     return Post(
-        Title=raw.get("title", ""),
-        Short_Summary=raw.get("summary", ""),
-        Date=raw.get("date", None),
-        Source_Url=raw.get("url", ""),
-        Focus_Area=raw.get("focus_area", ""),
-        Image_Url=[raw.get("img_url", "")] if raw.get("img_url") else [],
-        Content_Length=0,
-        Tags=raw.get("tags", ""),
-        Background=raw.get("background", ""),
-        News=raw.get("news", ""),
-        Highlights=raw.get("highlights", ""),
-        Impact=raw.get("impact", ""),
-        Whats_Next=raw.get("whats_next", ""),
-        Overview=raw.get("overview", ""),
-        Impacts=raw.get("impacts", "")
+        title=raw.get("title", ""),
+        slug=raw.get("slug", str(uuid.uuid4())),
+        summary=raw.get("summary", ""),
+        content=raw.get("content", ""),
+        cover_image=raw.get("cover_image", None),
+        source_urls=raw.get("source_urls", []),
+        tags=raw.get("tags", []),
+        category=raw.get("category", None),
+        status=raw.get("status", "published")
     )
 
 async def ingest_posts(db: Session) -> dict:
@@ -49,12 +44,12 @@ async def ingest_posts(db: Session) -> dict:
     new_count = 0
 
     for raw in raw_posts:
-        source_url = raw.get("url", "")
-        if not source_url:
+        slug = raw.get("slug", "")
+        if not slug:
             continue
 
         existing = db.exec(
-            select(Post).where(Post.Source_Url == source_url)
+            select(Post).where(Post.slug == slug)
         ).first()
         if existing:
             continue

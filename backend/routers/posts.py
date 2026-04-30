@@ -6,6 +6,7 @@ from models.post import Post
 from models.post_view import PostView
 from schemas.post import PostSummary, PostRead
 from sqlalchemy import or_, and_
+from uuid import UUID
 
 router = APIRouter()
 
@@ -13,17 +14,17 @@ router = APIRouter()
 def list_posts(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
-    focus_area: Optional[str] = None,
+    category: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     query = select(Post)
-    if focus_area:
-        query = query.where(Post.Focus_Area == focus_area)
+    if category:
+        query = query.where(Post.category == category)
         
     total = db.exec(select(func.count()).select_from(query.subquery())).one()
     
     posts = db.exec(
-        query.order_by(Post.Date.desc())
+        query.order_by(Post.created_at.desc())
         .offset((page - 1) * limit)
         .limit(limit)
     ).all()
@@ -47,8 +48,8 @@ def search_posts(
     for word in search_words:
         word_conditions.append(
             or_(
-                Post.Title.ilike(f"%{word}%"),
-                Post.Short_Summary.ilike(f"%{word}%")
+                Post.title.ilike(f"%{word}%"),
+                Post.summary.ilike(f"%{word}%")
             )
         )
         
@@ -64,7 +65,7 @@ def search_posts(
 
 @router.get("/{id}", response_model=PostRead)
 def get_post(
-    id: int,
+    id: UUID,
     request: Request,
     db: Session = Depends(get_db)
 ):
@@ -74,7 +75,7 @@ def get_post(
         
     # Record view
     user_agent = request.headers.get("user-agent")
-    view = PostView(post_id=post.Id, user_agent=user_agent)
+    view = PostView(post_id=post.id, user_agent=user_agent)
     db.add(view)
     db.commit()
     
