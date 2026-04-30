@@ -5,7 +5,7 @@ services:
     expose:
       - "8000"
     env_file:
-      - .env
+      - ./scrap_knowledge2/.env
 
   frontend:
     build: ./frontend
@@ -13,4 +13,4 @@ services:
     expose:
       - "3000"
     env_file:
-      - .env
+      - ./frontend/.env
