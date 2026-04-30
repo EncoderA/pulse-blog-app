@@ -9,4 +9,11 @@ def create_db_and_tables():
     import models.post
     import models.web_visitor
     import models.blog_visitor
+    import models.post_view
+    import models.app_visit
+    import models.timeline_post
+    import models.timeline_event
+    import models.timeline_quote
+    import models.timeline_comment
+    import models.timeline_agent_config
     SQLModel.metadata.create_all(engine)

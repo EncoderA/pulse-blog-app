@@ -3,9 +3,10 @@ from sqlalchemy import ARRAY, String, DateTime
 from typing import Optional, List
 from datetime import datetime
 
+
 class Post(SQLModel, table=True):
     __tablename__ = "posts"
-    
+
     Id: Optional[int] = Field(default=None, primary_key=True)
     Title: Optional[str] = Field(default=None, max_length=150)
     Short_Summary: Optional[str] = Field(default=None, max_length=300)

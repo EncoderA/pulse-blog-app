@@ -178,18 +178,26 @@ async def fetch_kb_posts_from_db():
 
     conn = await asyncpg.connect(
         os.getenv("KB_DB_URL"),
-        ssl="require"
+        ssl=os.getenv("KB_DB_SSLMODE", "require")
     )
 
     query = """
         SELECT
-            title,
-            summary_raw,
-            content_raw,
-            published_at,
-            source_url
-        FROM cleaned_articles
-        ORDER BY published_at DESC
+            ca.article_id,
+            ca.title,
+            ca.summary_raw,
+            ca.content_raw,
+            ca.published_at,
+            ca.source_url,
+            ca.file_content,
+            (
+                SELECT image_url
+                FROM cleaned_article_images
+                WHERE article_id = ca.article_id
+                LIMIT 1
+            ) AS primary_image
+        FROM cleaned_articles ca
+        ORDER BY ca.published_at DESC
         LIMIT 100;
     """
 
@@ -200,11 +208,14 @@ async def fetch_kb_posts_from_db():
 
     for row in rows:
         result.append({
+            "article_id": row["article_id"],
             "title": row["title"],
             "summary": row["summary_raw"],
             "content": row["content_raw"],
             "published_at": str(row["published_at"]),
-            "source_url": row["source_url"]
+            "source_url": row["source_url"],
+            "file_content": row["file_content"],
+            "primary_image": row["primary_image"],
         })
 
     return result

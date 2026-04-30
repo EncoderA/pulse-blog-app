@@ -9,8 +9,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { newsItems } from "@/lib/news";
 import { ComboboxMultiple } from "@/components/filter-multiselect";
+import { API_URL } from "@/lib/api";
+
+type BackendPostSummary = {
+  Id: number;
+  Title: string | null;
+  Short_Summary: string | null;
+  Date: string | null;
+  Focus_Area: string | null;
+};
 
 type NewsSearchParams = {
   category?: string | string[];
@@ -31,10 +39,20 @@ export default async function NewsPage({
 }) {
   const params = await searchParams;
   const activeCategories = allParams(params.category);
-  const categories = Array.from(new Set(newsItems.map((item) => item.category))).sort();
+  const res = await fetch(`${API_URL}/posts?page=1&limit=100`, { cache: "no-store" });
+  const data: { posts: BackendPostSummary[]; total: number; page: number } = res.ok
+    ? await res.json()
+    : { posts: [], total: 0, page: 1 };
 
-  const filteredItems = newsItems.filter((item) => {
-    return activeCategories.length === 0 || activeCategories.includes(item.category);
+  const categories = Array.from(
+    new Set(data.posts.map((item) => item.Focus_Area).filter(Boolean) as string[])
+  ).sort();
+
+  const filteredItems = data.posts.filter((item) => {
+    return (
+      activeCategories.length === 0 ||
+      (item.Focus_Area ? activeCategories.includes(item.Focus_Area) : false)
+    );
   });
 
   return (
@@ -56,7 +74,7 @@ export default async function NewsPage({
             items={categories}
             selectedItems={activeCategories}
             resultCount={filteredItems.length}
-            totalCount={newsItems.length}
+            totalCount={data.posts.length}
           />
         </div>
 
@@ -65,20 +83,22 @@ export default async function NewsPage({
 
       <div className="grid gap-4">
         {filteredItems.map((item) => (
-          <Card key={item.id} className="min-h-32 rounded-sm">
+          <Card key={item.Id} className="min-h-32 rounded-sm">
             <CardHeader>
               <div className="mb-2 flex items-center justify-between gap-3">
-                <Badge variant="outline">{item.category}</Badge>
-                <span className="text-xs text-muted-foreground">{item.date}</span>
+                <Badge variant="outline">{item.Focus_Area || "General"}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {item.Date ? new Date(item.Date).toLocaleDateString() : "-"}
+                </span>
               </div>
-              <CardTitle>{item.title}</CardTitle>
+              <CardTitle>{item.Title || "Untitled"}</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 text-sm leading-6 text-muted-foreground">
-              {item.excerpt}
+              {item.Short_Summary || "No summary available."}
             </CardContent>
             <CardFooter>
               <Link
-                href={`/news/${item.id}`}
+                href={`/news/${item.Id}`}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary"
               >
                 Read story

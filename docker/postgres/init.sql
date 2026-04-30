@@ -1,0 +1,2 @@
+CREATE DATABASE pulse_blog;
+CREATE DATABASE pulse_kb;

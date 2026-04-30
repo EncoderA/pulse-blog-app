@@ -66,7 +66,7 @@ if not DATABASE_URL:
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    connect_args={"sslmode": "require"}   # IMPORTANT for Neon
+    connect_args={"sslmode": os.getenv("POST_DB_SSLMODE", "require")}   # set to "disable" for local Docker DB
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

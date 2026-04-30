@@ -8,3 +8,4 @@ python-dotenv
 httpx
 pydantic-settings
 apscheduler
+google-generativeai

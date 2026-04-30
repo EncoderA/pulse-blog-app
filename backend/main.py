@@ -7,8 +7,9 @@ import datetime
 
 from core.config import settings
 from core.database import create_db_and_tables, engine
-from routers import auth, posts, admin, external
+from routers import auth, posts, admin, external, timeline
 from services.ingest import ingest_posts
+from services.enrichment_service import run_enrichment_batch
 from dependencies import get_db
 from models.web_visitor import WebVisitor
 from models.blog_visitor import BlogVisitor
@@ -24,6 +25,12 @@ async def lifespan(app: FastAPI):
     # Startup
     create_db_and_tables()
     scheduler.add_job(ingest_job, "interval", hours=3, id="ingest_posts")
+    scheduler.add_job(
+        run_enrichment_batch,
+        "interval",
+        minutes=settings.ENRICHMENT_INTERVAL_MINUTES,
+        id="ai_enrichment",
+    )
     scheduler.start()
     yield
     # Shutdown
@@ -43,6 +50,7 @@ app.include_router(auth.router, prefix="/auth")
 app.include_router(posts.router, prefix="/posts", tags=["posts"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(external.router, prefix="/public/analytics", tags=["public-analytics"])
+app.include_router(timeline.router, prefix="/timeline", tags=["timeline"])
 
 
 @app.post("/analytics/web-visit", tags=["analytics"])

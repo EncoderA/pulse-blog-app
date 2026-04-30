@@ -398,17 +398,15 @@
 
 import logging
 import os
+import re
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from dateutil import parser
 
 from app.services.kb_db_service import fetch_kb_posts_from_db
 
-# 🔹 LOGGING SETUP
 logging.basicConfig(level=logging.INFO)
 
-
-# 🔹 ENV VALIDATION (runs when file loads)
 if not os.getenv("KB_DB_URL"):
     raise Exception("KB_DB_URL missing")
 
@@ -416,46 +414,74 @@ if not os.getenv("POST_DB_URL"):
     raise Exception("POST_DB_URL missing")
 
 
+def _slugify(title: str) -> str:
+    """Generate a URL-safe slug from a title string."""
+    s = title.lower().strip()
+    s = re.sub(r"[^\w\s-]", "", s)
+    s = re.sub(r"[\s_-]+", "-", s)
+    return s[:200]
+
+
+def _parse_file_content(file_content: str) -> tuple:
+    """
+    Parse the file_content column from cleaned_articles.
+    Format: "title | 2-sentence summary | keywords: k1, k2 | entities: e1, e2"
+    Returns (tags: list[str], entities: list[str])
+    """
+    tags: list = []
+    entities: list = []
+    for part in (file_content or "").split(" | "):
+        if part.startswith("keywords: "):
+            tags = [k.strip() for k in part[len("keywords: "):].split(",") if k.strip()]
+        elif part.startswith("entities: "):
+            entities = [e.strip() for e in part[len("entities: "):].split(",") if e.strip()]
+    return tags, entities
+
+
+def _first_sentences(text: str, n: int) -> str:
+    """Return the first n sentences of text, joined with a space."""
+    if not text:
+        return ""
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    return " ".join(sentences[:n])
+
+
 async def ingest_from_kb(db: Session):
 
-    # 🔹 FETCH DATA
     try:
         kb_data = await fetch_kb_posts_from_db()
     except Exception as e:
         logging.error(f"KB fetch failed: {str(e)}")
-        return {
-            "status": "error",
-            "message": "Failed to fetch data from KB"
-        }
+        return {"status": "error", "message": "Failed to fetch data from KB"}
 
     inserted_count = 0
     skipped_count = 0
 
     for item in kb_data:
-
         try:
-            # 🔹 DATA VALIDATION
             if not item.get("title") or not item.get("source_url"):
                 skipped_count += 1
                 continue
 
-            title = item.get("title")[:150]
+            title = item["title"][:150]
             summary = (item.get("summary") or "")[:300]
             content = item.get("content") or ""
             raw_date = item.get("published_at")
-            source_url = item.get("source_url")
+            source_url = item["source_url"]
+            file_content = item.get("file_content") or ""
+            primary_image = item.get("primary_image")
+            article_id = item.get("article_id") or ""
 
-            # 🔹 DUPLICATE CHECK
+            # Duplicate check on posts table
             existing = db.execute(
                 text('SELECT "Id" FROM posts WHERE "Source_Url" = :url'),
                 {"url": source_url}
             ).fetchone()
-
             if existing:
                 skipped_count += 1
                 continue
 
-            # 🔹 SAFE DATE PARSING
+            # Date parsing
             parsed_date = None
             if raw_date:
                 try:
@@ -463,28 +489,13 @@ async def ingest_from_kb(db: Session):
                 except Exception:
                     parsed_date = None
 
-            # 🔹 DERIVED
             content_length = len(content)
+            tags, entities = _parse_file_content(file_content)
+            slug = _slugify(title)
+            short_summary = _first_sentences(content, 2)
+            quick_take = _first_sentences(summary, 1)
 
-            record = {
-                "Title": title,
-                "Short_Summary": summary,
-                "Date": parsed_date,
-                "Content_Length": content_length,
-                "Source_Url": source_url,
-
-                "Tags": "",
-                "Background": "",
-                "News": content[:300],
-                "Highlights": "",
-                "Impact": "",
-                "Whats_Next": "",
-                "Focus_Area": "",
-                "Overview": summary[:200],
-                "Impacts": "",
-                "Image_Url": []
-            }
-
+            # INSERT into posts
             db.execute(
                 text("""
                 INSERT INTO posts
@@ -498,7 +509,70 @@ async def ingest_from_kb(db: Session):
                  :Background,:News,:Highlights,:Impact,:Whats_Next,
                  :Focus_Area,:Overview,:Impacts,:Image_Url)
                 """),
-                record
+                {
+                    "Title": title,
+                    "Short_Summary": summary,
+                    "Date": parsed_date,
+                    "Content_Length": content_length,
+                    "Source_Url": source_url,
+                    "Tags": ", ".join(tags),
+                    "Background": "",
+                    "News": content[:300],
+                    "Highlights": "",
+                    "Impact": "",
+                    "Whats_Next": "",
+                    "Focus_Area": ", ".join(entities),
+                    "Overview": summary[:200],
+                    "Impacts": "",
+                    "Image_Url": [primary_image] if primary_image else [],
+                }
+            )
+
+            # UPSERT into timeline_posts (skip if article_id already exists)
+            db.execute(
+                text("""
+                INSERT INTO timeline_posts
+                    (article_id, kb_source, slug, title, short_summary, published_at,
+                     content_length, source_url, tags, focus_area, quick_take,
+                     primary_image_url, ingest_status)
+                VALUES
+                    (:article_id, :kb_source, :slug, :title, :short_summary, :published_at,
+                     :content_length, :source_url, :tags, :focus_area, :quick_take,
+                     :primary_image_url, 'pending')
+                ON CONFLICT (article_id) DO NOTHING
+                """),
+                {
+                    "article_id": article_id,
+                    "kb_source": "",
+                    "slug": slug,
+                    "title": title,
+                    "short_summary": short_summary[:500] if short_summary else summary,
+                    "published_at": parsed_date,
+                    "content_length": content_length,
+                    "source_url": source_url,
+                    "tags": tags,
+                    "focus_area": entities,
+                    "quick_take": quick_take[:500] if quick_take else None,
+                    "primary_image_url": primary_image,
+                }
+            )
+
+            # INSERT one timeline_event row (full content as the single event)
+            db.execute(
+                text("""
+                INSERT INTO timeline_events
+                    (post_id, event_time, event_title, event_content, sequence_order)
+                SELECT id, :event_time, :event_title, :event_content, 1
+                FROM timeline_posts
+                WHERE article_id = :article_id
+                ON CONFLICT DO NOTHING
+                """),
+                {
+                    "article_id": article_id,
+                    "event_time": parsed_date,
+                    "event_title": title,
+                    "event_content": content[:2000] if content else "",
+                }
             )
 
             inserted_count += 1
@@ -514,5 +588,5 @@ async def ingest_from_kb(db: Session):
     return {
         "status": "success",
         "inserted": inserted_count,
-        "skipped": skipped_count
+        "skipped": skipped_count,
     }

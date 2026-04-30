@@ -18,8 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.alter_column('blog_visitor', 'visite_date', new_column_name='visit_date')
+    op.alter_column('blog_visitor', 'date', new_column_name='visit_date')
 
 
 def downgrade() -> None:
-    op.alter_column('blog_visitor', 'visit_date', new_column_name='visite_date')
+    op.alter_column('blog_visitor', 'visit_date', new_column_name='date')

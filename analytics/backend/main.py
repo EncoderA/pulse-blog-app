@@ -3,6 +3,7 @@ from .database import engine, Base
 
 from backend.routers import scrapper_analytics
 from backend.utils.scheduler import start_scheduler
+from backend import models  # ensure tables are registered in metadata before create_all
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -29,10 +30,10 @@ async def startup():
 
     start_scheduler()  
 
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+# @app.on_event("startup")
+# async def startup():
+#     async with engine.begin() as conn:
+#         await conn.run_sync(Base.metadata.create_all)
 
 
 @app.get("/")

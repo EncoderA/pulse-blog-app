@@ -6,7 +6,13 @@ import {
   CalendarDays,
   CheckCircle2,
   CircleDot,
+  ClipboardList,
   Clock3,
+  Flag,
+  Lightbulb,
+  Rocket,
+  Sparkles,
+  Target,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,19 +25,9 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getNewsItem, newsItems } from "@/lib/news";
-import {
-  quickTake,
-  articleSections,
-  keyFacts,
-  topQuotes,
-  relatedTopics,
-  relatedArticles,
-} from "@/lib/news-detail";
+import { getTimelinePost } from "@/lib/api";
 
-export function generateStaticParams() {
-  return newsItems.map((item) => ({ id: item.id }));
-}
+const PLACEHOLDER = "Analysis coming soon.";
 
 export default async function TimelineDetailPage({
   params,
@@ -39,15 +35,65 @@ export default async function TimelineDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const item = getNewsItem(id);
+  const post = await getTimelinePost(id);
 
-  if (!item) {
+  if (!post) {
     notFound();
   }
 
-  const sortedTimeline = [...item.timeline].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  const readTime = `${Math.ceil((post.events.reduce((acc, e) => acc + (e.event_content?.length ?? 0), 0) || 800) / 800)} min read`;
+
+  const keyHighlightPoints = post.key_highlights
+    ? post.key_highlights.split("\n").filter(Boolean)
+    : [];
+
+  const quickTakeItems = [
+    {
+      title: "What Happened?",
+      description: post.what_happened ?? PLACEHOLDER,
+      icon: Sparkles,
+    },
+    {
+      title: "Why It Matters?",
+      description: post.impact ?? PLACEHOLDER,
+      icon: Lightbulb,
+    },
+    {
+      title: "What's Next?",
+      description: post.whats_next ?? PLACEHOLDER,
+      icon: Rocket,
+    },
+  ];
+
+  const articleSections = [
+    { title: "Background", body: post.background ?? PLACEHOLDER, points: undefined },
+    { title: "What Happened?", body: post.what_happened ?? PLACEHOLDER, points: undefined },
+    ...(keyHighlightPoints.length > 0
+      ? [{ title: "Key Highlights", body: undefined, points: keyHighlightPoints }]
+      : [{ title: "Key Highlights", body: PLACEHOLDER, points: undefined }]),
+    { title: "Impact", body: post.impact ?? PLACEHOLDER, points: undefined },
+    { title: "What's Next?", body: post.whats_next ?? PLACEHOLDER, points: undefined },
+  ];
+
+  const keyFacts = [
+    {
+      label: "Focus Areas",
+      value: post.focus_area?.join(", ") || "—",
+      icon: Target,
+    },
+    {
+      label: "Overview",
+      value: post.overview ?? "—",
+      icon: Flag,
+    },
+    {
+      label: "Implementation",
+      value: post.impacts_detail ?? "—",
+      icon: ClipboardList,
+    },
+  ];
+
+  const featuredQuote = post.quotes[0] ?? null;
 
   return (
     <article className="min-h-screen w-full bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -72,23 +118,31 @@ export default async function TimelineDetailPage({
           <header className="space-y-5">
             <div className="space-y-4">
               <h1 className="font-heading text-3xl font-bold leading-tight tracking-normal text-foreground sm:text-5xl">
-                {item.title}
+                {post.title ?? "Untitled"}
               </h1>
               <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
-                {item.excerpt}
+                {post.short_summary ?? "No summary available."}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <CalendarDays className="size-4 text-primary" />
-                {item.date}
+                {post.published_at
+                  ? new Date(post.published_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "—"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="size-4 text-primary" />
-                {item.readTime}
+                {readTime}
               </span>
-              <Badge variant="secondary">{item.category}</Badge>
+              <Badge variant="secondary">
+                {post.focus_area?.[0] ?? "General"}
+              </Badge>
             </div>
           </header>
 
@@ -100,7 +154,7 @@ export default async function TimelineDetailPage({
               Quick Take
             </h2>
             <div className="grid gap-4 sm:grid-cols-3">
-              {quickTake.map(({ title, description, icon: Icon }) => (
+              {quickTakeItems.map(({ title, description, icon: Icon }) => (
                 <div
                   key={title}
                   className="space-y-3 rounded-xl bg-muted/50 p-5 ring-1 ring-border transition duration-200 hover:bg-accent hover:shadow-sm"
@@ -123,48 +177,58 @@ export default async function TimelineDetailPage({
 
           <Separator />
 
-          {/* Timeline */}
-          <section className="space-y-6">
-            <h2 className="font-heading text-xl font-semibold tracking-normal text-foreground">
-              Story Timeline
-            </h2>
-            <ol className="grid gap-4">
-              {sortedTimeline.map((event, index) => (
-                <li
-                  key={`${event.date}-${event.title}`}
-                  className="relative pl-14"
-                >
-                  {/* Connector line */}
-                  {index < sortedTimeline.length - 1 && (
-                    <div className="absolute bottom-[-1.25rem] left-5 top-10 w-px bg-border" />
-                  )}
-                  {/* Icon */}
-                  <div className="absolute left-0 top-4 z-10 flex size-10 items-center justify-center rounded-full border bg-background text-primary shadow-sm">
-                    <CircleDot className="size-4" />
-                  </div>
-                  {/* Event card */}
-                  <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
-                        {event.date}
-                      </span>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Incident {String(index + 1).padStart(2, "0")}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                      {event.title}
-                    </h3>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {event.description}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
+          {/* Story Timeline (events) */}
+          {post.events.length > 0 && (
+            <>
+              <section className="space-y-6">
+                <h2 className="font-heading text-xl font-semibold tracking-normal text-foreground">
+                  Story Timeline
+                </h2>
+                <ol className="grid gap-4">
+                  {post.events.map((event, index) => (
+                    <li
+                      key={event.id}
+                      className="relative pl-14"
+                    >
+                      {/* Connector line */}
+                      {index < post.events.length - 1 && (
+                        <div className="absolute bottom-[-1.25rem] left-5 top-10 w-px bg-border" />
+                      )}
+                      {/* Icon */}
+                      <div className="absolute left-0 top-4 z-10 flex size-10 items-center justify-center rounded-full border bg-background text-primary shadow-sm">
+                        <CircleDot className="size-4" />
+                      </div>
+                      {/* Event card */}
+                      <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="rounded-md bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
+                            {event.event_time
+                              ? new Date(event.event_time).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : "—"}
+                          </span>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Incident {String(index + 1).padStart(2, "0")}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-foreground">
+                          {event.event_title ?? "—"}
+                        </h3>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          {event.event_content ?? ""}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
 
-          <Separator />
+              <Separator />
+            </>
+          )}
 
           {/* Article body */}
           <section className="space-y-8">
@@ -191,23 +255,26 @@ export default async function TimelineDetailPage({
             ))}
           </section>
 
-          <Separator />
-
           {/* Featured quote */}
-          <blockquote className="flex gap-5 border-l-4 border-primary pl-6">
-            <div className="space-y-3">
-              <p className="text-xl font-medium leading-8 text-foreground">
-                &quot;Artificial intelligence must become a force multiplier for
-                every citizen, every startup, and every public service.&quot;
-              </p>
-              <footer>
-                <p className="font-semibold text-foreground">Narendra Modi</p>
-                <p className="text-sm text-muted-foreground">
-                  Prime Minister of India
-                </p>
-              </footer>
-            </div>
-          </blockquote>
+          {featuredQuote && (
+            <>
+              <Separator />
+              <blockquote className="flex gap-5 border-l-4 border-primary pl-6">
+                <div className="space-y-3">
+                  <p className="text-xl font-medium leading-8 text-foreground">
+                    &quot;{featuredQuote.quote_text}&quot;
+                  </p>
+                  {featuredQuote.attributed_to && (
+                    <footer>
+                      <p className="font-semibold text-foreground">
+                        {featuredQuote.attributed_to}
+                      </p>
+                    </footer>
+                  )}
+                </div>
+              </blockquote>
+            </>
+          )}
         </main>
 
         {/* ── Sidebar ── */}
@@ -234,73 +301,51 @@ export default async function TimelineDetailPage({
           </Card>
 
           {/* Top Quotes */}
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="text-base font-semibold">Top Quotes</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              {topQuotes.map((quote) => (
-                <blockquote
-                  key={quote.author}
-                  className="rounded-xl bg-muted/40 p-4 ring-1 ring-border"
-                >
-                  <p className="text-sm leading-6 text-card-foreground">
-                    &quot;{quote.text}&quot;
-                  </p>
-                  <footer className="mt-3">
-                    <p className="text-sm font-semibold text-card-foreground">{quote.author}</p>
-                    <p className="text-xs text-muted-foreground">{quote.designation}</p>
-                  </footer>
-                </blockquote>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Related Topics */}
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="text-base font-semibold">Related Topics</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2 pt-4">
-              {relatedTopics.map((topic) => (
-                <Badge
-                  key={topic.name}
-                  variant="outline"
-                  className="transition hover:bg-accent hover:text-accent-foreground"
-                >
-                  {topic.name} · {topic.count}
-                </Badge>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* You May Also Like */}
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="text-base font-semibold">You May Also Like</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 pt-4">
-              {relatedArticles.map((article) => (
-                <Link
-                  key={article.title}
-                  href="/timeline"
-                  className="group flex gap-3 rounded-lg p-2 transition hover:bg-accent"
-                >
-                  <div
-                    className={`flex size-14 shrink-0 items-center justify-center rounded-lg ${article.thumbnail} shadow-sm`}
+          {post.quotes.length > 0 && (
+            <Card>
+              <CardHeader className="border-b">
+                <CardTitle className="text-base font-semibold">Top Quotes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                {post.quotes.map((quote) => (
+                  <blockquote
+                    key={quote.id}
+                    className="rounded-xl bg-muted/40 p-4 ring-1 ring-border"
                   >
-                    <article.icon className="size-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="line-clamp-2 text-sm font-semibold leading-5 text-card-foreground transition group-hover:text-accent-foreground">
-                      {article.title}
+                    <p className="text-sm leading-6 text-card-foreground">
+                      &quot;{quote.quote_text}&quot;
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">{article.date}</p>
-                  </div>
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
+                    {quote.attributed_to && (
+                      <footer className="mt-3">
+                        <p className="text-sm font-semibold text-card-foreground">
+                          {quote.attributed_to}
+                        </p>
+                      </footer>
+                    )}
+                  </blockquote>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Source */}
+          {post.source_url && (
+            <Card>
+              <CardHeader className="border-b">
+                <CardTitle className="text-base font-semibold">Source</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <a
+                  href={post.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary underline-offset-4 hover:underline"
+                >
+                  Read original article
+                </a>
+              </CardContent>
+            </Card>
+          )}
         </aside>
       </div>
     </article>

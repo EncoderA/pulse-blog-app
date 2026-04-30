@@ -1,0 +1,92 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pulse_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: pulse_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: pulse_frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_ANALYTICS_URL: http://localhost:4005
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  post-service:
+    build: ./post-service
+    container_name: pulse_post_service
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scrap-knowledge2:
+    build: ./scrap_knowledge2
+    container_name: pulse_scrap_knowledge2
+    ports:
+      - "8002:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://neondb_owner:npg_RIobv8lu4yOg@ep-red-frost-aolfxwsd.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  analytics:
+    build:
+      context: ./analytics
+      args:
+        VITE_API_URL: http://localhost:4004
+    container_name: pulse_analytics
+    ports:
+      - "4004:4004"
+      - "4005:4005"
+    env_file:
+      - .env
+    environment:
+      # asyncpg does not support sslmode query-param; SSL is set via connect_args using ANALYTICS_DB_SSLMODE
+      DATABASE_URL: postgresql+asyncpg://neondb_owner:npg_RIobv8lu4yOg@ep-red-frost-aolfxwsd.c-2.ap-southeast-1.aws.neon.tech/neondb
+      ANALYTICS_DB_SSLMODE: require
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "/app/start.sh"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:

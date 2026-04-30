@@ -21,8 +21,10 @@ import CreatePostDialog from "./create-post-dialog"
 
 const navItems = [
   { href: "/news", label: "News" },
-  { href: "/admin", label: "Admin" },
   { href: "/timeline", label: "News Timeline" },
+  { href: "/analytics", label: "Analytics" },
+  { href: "/agent-config", label: "Configure Agent" },
+  { href: "/admin", label: "Admin" },
 ]
 
 function NavLinks({ className }: { className?: string }) {

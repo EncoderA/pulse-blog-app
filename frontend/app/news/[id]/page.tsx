@@ -18,7 +18,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getNewsItem, newsItems } from "@/lib/news";
+import { API_URL } from "@/lib/api";
 import {
   quickTake,
   articleSections,
@@ -28,9 +28,13 @@ import {
   relatedArticles,
 } from "@/lib/news-detail";
 
-export function generateStaticParams() {
-  return newsItems.map((item) => ({ id: item.id }));
-}
+type BackendPostRead = {
+  Id: number;
+  Title: string | null;
+  Short_Summary: string | null;
+  Date: string | null;
+  Focus_Area: string | null;
+};
 
 export default async function NewsDetailPage({
   params,
@@ -38,11 +42,11 @@ export default async function NewsDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const item = getNewsItem(id);
-
-  if (!item) {
+  const res = await fetch(`${API_URL}/posts/${id}`, { cache: "no-store" });
+  if (!res.ok) {
     notFound();
   }
+  const item: BackendPostRead = await res.json();
 
   return (
     <article className="min-h-screen w-full bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
@@ -67,23 +71,23 @@ export default async function NewsDetailPage({
           <header className="space-y-5">
             <div className="space-y-4">
               <h1 className="font-heading text-3xl font-bold leading-tight tracking-normal text-foreground sm:text-5xl">
-                {item.title}
+                {item.Title || "Untitled"}
               </h1>
               <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
-                {item.excerpt}
+                {item.Short_Summary || "No summary available."}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <CalendarDays className="size-4 text-primary" />
-                {item.date}
+                {item.Date ? new Date(item.Date).toLocaleDateString() : "-"}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Clock3 className="size-4 text-primary" />
-                {item.readTime}
+                4 min read
               </span>
-              <Badge variant="secondary">{item.category}</Badge>
+              <Badge variant="secondary">{item.Focus_Area || "General"}</Badge>
             </div>
           </header>
 
