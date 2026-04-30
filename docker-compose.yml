@@ -9,7 +9,7 @@ services:
     depends_on:
       - frontend
       - scrap-knowledge2
-  
+
   services:
   backend:
     build: ./backend
@@ -34,21 +34,6 @@ services:
     container_name: frontend_service
     ports:
       - "3000:3000"
-    expose:
-      - "3000"
-    env_file:
-      - ./frontend/.env
-  scrap-knowledge2:
-    build: ./scrap_knowledge2
-    container_name: scrap_knowledge2_service
-    expose:
-      - "8000"
-    env_file:
-      - ./scrap_knowledge2/.env
-
-  frontend:
-    build: ./frontend
-    container_name: frontend_service
     expose:
       - "3000"
     env_file:
