@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pulse News",
+  title: "Pulse blog",
   description: "Pulse news, stories, and admin dashboard",
 };
 
