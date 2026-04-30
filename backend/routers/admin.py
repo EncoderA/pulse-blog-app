@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 from dependencies import get_db, require_admin
 from models.post import Post
+from models.post_view import PostView
 from models.web_visitor import WebVisitor
 from models.blog_visitor import BlogVisitor
 from services.ingest import ingest_posts
@@ -26,9 +27,9 @@ def get_analytics_overview(
         .order_by(func.count(PostView.id).desc())
         .limit(1)
     )
-    top_blog_res = db.exec(top_blog_query).first()
+    top_post_res = db.exec(top_post_query).first()
     top_post = None
-    if top_blog_res:
+    if top_post_res:
         top_post = {
             "id": top_post_res[0],
             "title": top_post_res[1],
