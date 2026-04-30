@@ -1,28 +1,23 @@
 from sqlmodel import SQLModel, Field, Column
-from sqlalchemy import ARRAY, String, DateTime
+from sqlalchemy import ARRAY, String, Text
 from typing import Optional, List
+from uuid import UUID, uuid4
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
 class Post(SQLModel, table=True):
-    __tablename__ = "posts"
+    __tablename__ = "post"
     
-    Id: Optional[int] = Field(default=None, primary_key=True)
-    Title: Optional[str] = Field(default=None, max_length=150)
-    Short_Summary: Optional[str] = Field(default=None, max_length=300)
-
-    Date: Optional[datetime] = Field(default=None, sa_column=Column(DateTime(timezone=True)))
-    Content_Length: Optional[int] = None
-    Source_Url: Optional[str] = Field(default=None, max_length=255)
-    Tags: Optional[str] = Field(default=None, max_length=200)
-
-    Background: Optional[str] = Field(default=None, max_length=300)
-    News: Optional[str] = Field(default=None, max_length=300)
-    Highlights: Optional[str] = Field(default=None, max_length=300)
-    Impact: Optional[str] = Field(default=None, max_length=150)
-    Whats_Next: Optional[str] = Field(default=None, max_length=150)
-
-    Focus_Area: Optional[str] = Field(default=None, max_length=200)
-    Overview: Optional[str] = Field(default=None, max_length=200)
-    Impacts: Optional[str] = Field(default=None, max_length=200)
-
-    Image_Url: Optional[List[str]] = Field(default=[], sa_column=Column(ARRAY(String(255))))
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    title: str = Field(max_length=255)
+    slug: str = Field(max_length=255)
+    summary: str = Field(max_length=1000)
+    content: str = Field(sa_column=Column(Text))
+    cover_image: Optional[str] = Field(default=None, max_length=255)
+    source_urls: List[str] = Field(default=[], sa_column=Column(ARRAY(String)))
+    tags: List[str] = Field(default=[], sa_column=Column(ARRAY(String)))
+    category: Optional[str] = Field(default=None, max_length=255)
+    status: str = Field(default="published", max_length=50)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    search_vector: Optional[str] = Field(default=None, sa_column=Column(TSVECTOR))

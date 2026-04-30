@@ -1,40 +1,35 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 
 class PostRead(BaseModel):
-    Id: int
-    Title: Optional[str] = None
-    Short_Summary: Optional[str] = None
-
-    Date: Optional[datetime] = None
-    Content_Length: Optional[int] = None
-    Source_Url: Optional[str] = None
-    Tags: Optional[str] = None
-
-    Background: Optional[str] = None
-    News: Optional[str] = None
-    Highlights: Optional[str] = None
-    Impact: Optional[str] = None
-    Whats_Next: Optional[str] = None
-
-    Focus_Area: Optional[str] = None
-    Overview: Optional[str] = None
-    Impacts: Optional[str] = None
-
-    Image_Url: Optional[List[str]] = None
+    id: UUID
+    title: str
+    slug: str
+    summary: str
+    content: str
+    cover_image: Optional[str] = None
+    source_urls: List[str] = []
+    tags: List[str] = []
+    category: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
 
 class PostSummary(BaseModel):
     """Lightweight version for paginated feed"""
-    Id: int
-    Title: Optional[str] = None
-    Short_Summary: Optional[str] = None
-    Date: Optional[datetime] = None
-    Focus_Area: Optional[str] = None
-    Image_Url: Optional[List[str]] = None
+    id: UUID
+    title: str
+    slug: str
+    summary: str
+    cover_image: Optional[str] = None
+    tags: List[str] = []
+    category: Optional[str] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
