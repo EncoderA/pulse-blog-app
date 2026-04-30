@@ -22,7 +22,6 @@ import CreatePostDialog from "./create-post-dialog"
 const navItems = [
   { href: "/news", label: "News" },
   { href: "/admin", label: "Admin" },
-  { href: "/json-visualizer", label: "JSON Visualizer" },
   { href: "/timeline", label: "News Timeline" },
 ]
 
@@ -61,7 +60,7 @@ export function Header() {
 
         <div className="hidden items-center gap-3 md:flex">
           <HeaderSearch />
-          <CreatePostDialog />
+          {/* <CreatePostDialog /> */}
           <NavLinks />
           <div className="h-6 w-px bg-border" />
           <ThemeToggle />

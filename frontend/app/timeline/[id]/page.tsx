@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
+  CircleDot,
   Clock3,
 } from "lucide-react";
 
@@ -32,7 +33,7 @@ export function generateStaticParams() {
   return newsItems.map((item) => ({ id: item.id }));
 }
 
-export default async function NewsDetailPage({
+export default async function TimelineDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -44,23 +45,27 @@ export default async function NewsDetailPage({
     notFound();
   }
 
+  const sortedTimeline = [...item.timeline].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
   return (
     <article className="min-h-screen w-full bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(280px,3fr)]">
 
-        {/* ── Main column ── no cards, content breathes directly on the page */}
+        {/* ── Main column ── */}
         <main className="min-w-0 space-y-10">
 
           {/* Back link */}
           <Link
-            href="/news"
+            href="/timeline"
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
               "-ml-2 text-muted-foreground"
             )}
           >
             <ArrowLeft className="size-4" />
-            Back to news
+            Back to timeline
           </Link>
 
           {/* Hero / article header */}
@@ -98,7 +103,7 @@ export default async function NewsDetailPage({
               {quickTake.map(({ title, description, icon: Icon }) => (
                 <div
                   key={title}
-                  className="space-y-3 rounded-xl bg-muted/50 p-5 ring-1 ring-border transition duration-200  hover:bg-accent hover:shadow-sm"
+                  className="space-y-3 rounded-xl bg-muted/50 p-5 ring-1 ring-border transition duration-200 hover:bg-accent hover:shadow-sm"
                 >
                   <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
                     <Icon className="size-5" />
@@ -114,6 +119,49 @@ export default async function NewsDetailPage({
                 </div>
               ))}
             </div>
+          </section>
+
+          <Separator />
+
+          {/* Timeline */}
+          <section className="space-y-6">
+            <h2 className="font-heading text-xl font-semibold tracking-normal text-foreground">
+              Story Timeline
+            </h2>
+            <ol className="grid gap-4">
+              {sortedTimeline.map((event, index) => (
+                <li
+                  key={`${event.date}-${event.title}`}
+                  className="relative pl-14"
+                >
+                  {/* Connector line */}
+                  {index < sortedTimeline.length - 1 && (
+                    <div className="absolute bottom-[-1.25rem] left-5 top-10 w-px bg-border" />
+                  )}
+                  {/* Icon */}
+                  <div className="absolute left-0 top-4 z-10 flex size-10 items-center justify-center rounded-full border bg-background text-primary shadow-sm">
+                    <CircleDot className="size-4" />
+                  </div>
+                  {/* Event card */}
+                  <div className="rounded-xl bg-muted/40 p-4 ring-1 ring-border">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
+                        {event.date}
+                      </span>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Incident {String(index + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {event.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {event.description}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </section>
 
           <Separator />
@@ -164,6 +212,7 @@ export default async function NewsDetailPage({
 
         {/* ── Sidebar ── */}
         <aside className="space-y-5 lg:sticky lg:top-6 lg:self-start">
+
           {/* Key Facts */}
           <Card>
             <CardHeader className="border-b">
@@ -234,7 +283,7 @@ export default async function NewsDetailPage({
               {relatedArticles.map((article) => (
                 <Link
                   key={article.title}
-                  href="/news"
+                  href="/timeline"
                   className="group flex gap-3 rounded-lg p-2 transition hover:bg-accent"
                 >
                   <div
