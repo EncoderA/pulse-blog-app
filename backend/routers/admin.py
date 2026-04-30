@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 from dependencies import get_db, require_admin
 from models.post import Post
+from models.post_view import PostView
 from models.web_visitor import WebVisitor
 from models.blog_visitor import BlogVisitor
 from services.ingest import ingest_posts
@@ -15,29 +16,31 @@ def get_analytics_overview(
     db: Session = Depends(get_db),
     admin_data: dict = Depends(require_admin)
 ):
-    total_posts = db.exec(select(func.count(Post.id))).one()
-
-    # Top post by blog visits (all-time)
-    top_blog_query = (
-        select(BlogVisitor.blog_id, func.sum(BlogVisitor.visitor_count).label("view_count"))
-        .group_by(BlogVisitor.blog_id)
-        .order_by(func.sum(BlogVisitor.visitor_count).desc())
+    total_posts = db.exec(select(func.count(Post.Id))).one()
+    total_views = db.exec(select(func.count(PostView.id))).one()
+    
+    # Top post by views
+    top_post_query = (
+        select(Post.Id, Post.Title, func.count(PostView.id).label("view_count"))
+        .join(PostView, PostView.post_id == Post.Id, isouter=True)
+        .group_by(Post.Id, Post.Title)
+        .order_by(func.count(PostView.id).desc())
         .limit(1)
     )
-    top_blog_res = db.exec(top_blog_query).first()
+    top_post_res = db.exec(top_post_query).first()
     top_post = None
-    if top_blog_res:
+    if top_post_res:
         top_post = {
-            "blog_id": top_blog_res[0],
-            "view_count": top_blog_res[1],
+            "id": top_post_res[0],
+            "title": top_post_res[1],
+            "view_count": top_post_res[2]
         }
 
     # Top focus area
-    from sqlalchemy import text
-    top_focus_query = select(text("unnest(focus_areas) as focus_area, count(*) as count"))\
-        .select_from(Post.__table__)\
-        .group_by(text("focus_area"))\
-        .order_by(text("count DESC"))\
+    top_focus_query = select(Post.Focus_Area, func.count(Post.Id).label("count"))\
+        .where(Post.Focus_Area != None)\
+        .group_by(Post.Focus_Area)\
+        .order_by(func.count(Post.Id).desc())\
         .limit(1)
 
     top_focus_res = db.exec(top_focus_query).first()
@@ -58,28 +61,24 @@ def get_top_posts(
 ):
     query = (
         select(
-            Post.id,
-            Post.title,
-            Post.img_url,
-            Post.published_date,
-            func.coalesce(func.sum(BlogVisitor.visitor_count), 0).label("view_count"),
+            Post.Id, 
+            Post.Title, 
+            Post.Image_Url, 
+            Post.Date, 
+            func.count(PostView.id).label("view_count")
         )
-        .join(
-            BlogVisitor,
-            BlogVisitor.blog_id == cast(Post.id, String),
-            isouter=True,
-        )
-        .group_by(Post.id)
-        .order_by(func.coalesce(func.sum(BlogVisitor.visitor_count), 0).desc())
+        .join(PostView, PostView.post_id == Post.Id, isouter=True)
+        .group_by(Post.Id, Post.Title, Post.Image_Url, Post.Date)
+        .order_by(func.count(PostView.id).desc())
         .limit(limit)
     )
     results = db.exec(query).all()
 
     return [
         {
-            "id": str(r[0]),
+            "id": r[0],
             "title": r[1],
-            "img_url": r[2],
+            "img_url": r[2][0] if r[2] and len(r[2]) > 0 else None,
             "published_date": r[3],
             "view_count": r[4],
         }
@@ -92,17 +91,16 @@ def get_analytics_tags(
     db: Session = Depends(get_db),
     admin_data: dict = Depends(require_admin)
 ):
-    from sqlalchemy import text
-    query = select(text("unnest(focus_areas) as focus_area, count(*) as count"))\
-        .select_from(Post.__table__)\
-        .group_by(text("focus_area"))\
-        .order_by(text("count DESC"))
-
+    query = select(Post.Focus_Area.label("focus_area"), func.count(Post.Id).label("count"))\
+        .where(Post.Focus_Area != None)\
+        .group_by(Post.Focus_Area)\
+        .order_by(func.count(Post.Id).desc())
+    
     results = db.exec(query).all()
 
     return [
         {"focus_area": r[0], "count": r[1]}
-        for r in results
+        for r in results if r[0] is not None
     ]
 
 
