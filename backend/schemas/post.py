@@ -3,28 +3,38 @@ from typing import Optional, List
 from datetime import datetime
 
 class PostRead(BaseModel):
-    id: str
-    title: str
-    summary: str
-    main_content: str
-    img_url: Optional[str]
-    article_source_urls: List[str]
-    focus_areas: List[str]
-    published_date: Optional[datetime]
-    created_at: datetime
+    Id: int
+    Title: Optional[str] = None
+    Short_Summary: Optional[str] = None
+
+    Date: Optional[datetime] = None
+    Content_Length: Optional[int] = None
+    Source_Url: Optional[str] = None
+    Tags: Optional[str] = None
+
+    Background: Optional[str] = None
+    News: Optional[str] = None
+    Highlights: Optional[str] = None
+    Impact: Optional[str] = None
+    Whats_Next: Optional[str] = None
+
+    Focus_Area: Optional[str] = None
+    Overview: Optional[str] = None
+    Impacts: Optional[str] = None
+
+    Image_Url: Optional[List[str]] = None
 
     class Config:
         from_attributes = True
 
 class PostSummary(BaseModel):
-    """Lightweight version for paginated feed — excludes main_content"""
-    id: str
-    title: str
-    summary: str
-    img_url: Optional[str]
-    focus_areas: List[str]
-    published_date: Optional[datetime]
-    created_at: datetime
+    """Lightweight version for paginated feed"""
+    Id: int
+    Title: Optional[str] = None
+    Short_Summary: Optional[str] = None
+    Date: Optional[datetime] = None
+    Focus_Area: Optional[str] = None
+    Image_Url: Optional[List[str]] = None
 
     class Config:
         from_attributes = True

@@ -12,14 +12,14 @@ def get_analytics_overview(
     db: Session = Depends(get_db),
     admin_data: dict = Depends(require_admin)
 ):
-    total_posts = db.exec(select(func.count(Post.id))).one()
+    total_posts = db.exec(select(func.count(Post.Id))).one()
     total_views = db.exec(select(func.count(PostView.id))).one()
     
     # Top post by views
     top_post_query = (
-        select(Post.id, Post.title, func.count(PostView.id).label("view_count"))
-        .join(PostView, PostView.post_id == Post.id, isouter=True)
-        .group_by(Post.id)
+        select(Post.Id, Post.Title, func.count(PostView.id).label("view_count"))
+        .join(PostView, PostView.post_id == Post.Id, isouter=True)
+        .group_by(Post.Id, Post.Title)
         .order_by(func.count(PostView.id).desc())
         .limit(1)
     )
@@ -27,17 +27,16 @@ def get_analytics_overview(
     top_post = None
     if top_post_res:
         top_post = {
-            "id": str(top_post_res[0]),
+            "id": top_post_res[0],
             "title": top_post_res[1],
             "view_count": top_post_res[2]
         }
     
     # Top focus area
-    from sqlalchemy import text
-    top_focus_query = select(text("unnest(focus_areas) as focus_area, count(*) as count"))\
-        .select_from(Post.__table__)\
-        .group_by(text("focus_area"))\
-        .order_by(text("count DESC"))\
+    top_focus_query = select(Post.Focus_Area, func.count(Post.Id).label("count"))\
+        .where(Post.Focus_Area != None)\
+        .group_by(Post.Focus_Area)\
+        .order_by(func.count(Post.Id).desc())\
         .limit(1)
     
     top_focus_res = db.exec(top_focus_query).first()
@@ -58,14 +57,14 @@ def get_top_posts(
 ):
     query = (
         select(
-            Post.id, 
-            Post.title, 
-            Post.img_url, 
-            Post.published_date, 
+            Post.Id, 
+            Post.Title, 
+            Post.Image_Url, 
+            Post.Date, 
             func.count(PostView.id).label("view_count")
         )
-        .join(PostView, PostView.post_id == Post.id, isouter=True)
-        .group_by(Post.id)
+        .join(PostView, PostView.post_id == Post.Id, isouter=True)
+        .group_by(Post.Id, Post.Title, Post.Image_Url, Post.Date)
         .order_by(func.count(PostView.id).desc())
         .limit(limit)
     )
@@ -73,9 +72,9 @@ def get_top_posts(
     
     return [
         {
-            "id": str(r[0]),
+            "id": r[0],
             "title": r[1],
-            "img_url": r[2],
+            "img_url": r[2][0] if r[2] and len(r[2]) > 0 else None,
             "published_date": r[3],
             "view_count": r[4]
         }
@@ -87,17 +86,16 @@ def get_analytics_tags(
     db: Session = Depends(get_db),
     admin_data: dict = Depends(require_admin)
 ):
-    from sqlalchemy import text
-    query = select(text("unnest(focus_areas) as focus_area, count(*) as count"))\
-        .select_from(Post.__table__)\
-        .group_by(text("focus_area"))\
-        .order_by(text("count DESC"))
+    query = select(Post.Focus_Area.label("focus_area"), func.count(Post.Id).label("count"))\
+        .where(Post.Focus_Area != None)\
+        .group_by(Post.Focus_Area)\
+        .order_by(func.count(Post.Id).desc())
     
     results = db.exec(query).all()
     
     return [
         {"focus_area": r[0], "count": r[1]}
-        for r in results
+        for r in results if r[0] is not None
     ]
 
 @router.post("/ingest")
