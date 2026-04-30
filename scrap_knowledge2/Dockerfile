@@ -14,7 +14,7 @@ COPY pyproject.toml README.md /app/
 COPY src/ /app/src/
 
 RUN python -m pip install --upgrade pip setuptools wheel \
-  && python -m pip install -e .
+  && python -m pip install -e ".[embeddings]"
 
 EXPOSE 8000
 
