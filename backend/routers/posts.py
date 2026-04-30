@@ -5,6 +5,7 @@ from dependencies import get_db
 from models.post import Post
 from models.post_view import PostView
 from schemas.post import PostSummary, PostRead
+from sqlalchemy import or_, and_
 
 router = APIRouter()
 
@@ -38,10 +39,22 @@ def search_posts(
     q: str = Query(..., min_length=1),
     db: Session = Depends(get_db)
 ):
-    query = select(Post).where(
-        (Post.Title.ilike(f"%{q}%")) | 
-        (Post.Short_Summary.ilike(f"%{q}%"))
-    )
+    # Split the search phrase into individual words (e.g. "oil price" -> ["oil", "price"])
+    search_words = q.strip().split()
+    
+    # Create a condition for each word
+    word_conditions = []
+    for word in search_words:
+        word_conditions.append(
+            or_(
+                Post.Title.ilike(f"%{word}%"),
+                Post.Short_Summary.ilike(f"%{word}%")
+            )
+        )
+        
+    # Combine all word conditions with AND 
+    # (so the post must contain ALL searched words in any order)
+    query = select(Post).where(and_(*word_conditions))
     posts = db.exec(query).all()
     
     return {
