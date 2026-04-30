@@ -53,14 +53,14 @@ def get_post(
     request: Request,
     db: Session = Depends(get_db)
 ):
+    # Record view even if post doesn't exist locally
+    user_agent = request.headers.get("user-agent")
+    view = PostView(post_id=id, user_agent=user_agent)
+    db.add(view)
+    db.commit()
+
     post = db.get(Post, id)
     if not post:
         raise HTTPException(404, "Post not found")
         
-    # Record view
-    user_agent = request.headers.get("user-agent")
-    view = PostView(post_id=post.id, user_agent=user_agent)
-    db.add(view)
-    db.commit()
-    
     return post

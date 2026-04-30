@@ -22,6 +22,7 @@ from sqlmodel import SQLModel
 from core.config import settings
 import models.post
 import models.post_view
+import models.app_visit
 
 # add your model's MetaData object here
 # for 'autogenerate' support
