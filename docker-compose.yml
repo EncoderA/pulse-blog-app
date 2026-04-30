@@ -7,10 +7,10 @@ services:
     env_file:
       - .env
 
-  frontend:
-    build: ./frontend
-    container_name: frontend_service
-    expose:
-      - "3000"
-    env_file:
-      - .env
+  # frontend:
+  #   build: ./frontend
+  #   container_name: frontend_service
+  #   expose:
+  #     - "3000"
+  #   env_file:
+  #     - .env
