@@ -1,231 +1,160 @@
-from datetime import datetime, timedelta
-from typing import Optional
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func, col, text
-
-from core.database import get_db
-from dependencies import require_admin
+import datetime
+from fastapi import APIRouter, Depends
+from sqlmodel import Session, select, func
+from dependencies import get_db, require_admin
 from models.post import Post
-from models.post_view import PostView
-from models.user import User
-from schemas.post import PostCreate, PostRead, PostUpdate
+from models.web_visitor import WebVisitor
+from models.blog_visitor import BlogVisitor
+from services.ingest import ingest_posts
+from sqlalchemy import cast, String
 
-router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _post_to_read(post: Post) -> PostRead:
-    return PostRead(
-        id=str(post.id),
-        title=post.title,
-        slug=post.slug,
-        summary=post.summary,
-        content=post.content,
-        cover_image=post.cover_image,
-        tags=post.tags or [],
-        category=post.category,
-        source_urls=post.source_urls or [],
-        created_at=post.created_at,
-        updated_at=post.updated_at,
-    )
-
-
-# ---------------------------------------------------------------------------
-# CRUD
-# ---------------------------------------------------------------------------
-
-@router.get("/posts")
-def list_all_posts(
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
-):
-    posts = db.exec(select(Post).order_by(Post.created_at.desc())).all()
-    return {
-        "posts": [_post_to_read(p) for p in posts],
-        "total": len(posts),
-    }
-
-
-@router.post("/posts", response_model=PostRead, status_code=201)
-def create_post(
-    body: PostCreate,
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
-):
-    # Check slug uniqueness
-    existing = db.exec(select(Post).where(Post.slug == body.slug)).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Slug already exists")
-
-    post = Post(
-        title=body.title,
-        slug=body.slug,
-        summary=body.summary,
-        content=body.content,
-        cover_image=body.cover_image,
-        source_urls=body.source_urls,
-        tags=body.tags,
-        category=body.category,
-        status="published",
-    )
-    db.add(post)
-    db.commit()
-    db.refresh(post)
-    return _post_to_read(post)
-
-
-@router.put("/posts/{id}", response_model=PostRead)
-def update_post(
-    id: UUID,
-    body: PostUpdate,
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
-):
-    post = db.get(Post, id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    update_data = body.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(post, key, value)
-    post.updated_at = datetime.utcnow()
-
-    db.add(post)
-    db.commit()
-    db.refresh(post)
-    return _post_to_read(post)
-
-
-@router.delete("/posts/{id}", status_code=204)
-def delete_post(
-    id: UUID,
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
-):
-    post = db.get(Post, id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    # Delete associated views first
-    views = db.exec(select(PostView).where(PostView.post_id == id)).all()
-    for view in views:
-        db.delete(view)
-
-    db.delete(post)
-    db.commit()
-
-
-# ---------------------------------------------------------------------------
-# Analytics
-# ---------------------------------------------------------------------------
+router = APIRouter()
 
 @router.get("/analytics/overview")
-def analytics_overview(
+def get_analytics_overview(
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    admin_data: dict = Depends(require_admin)
 ):
-    total_posts = db.exec(select(func.count()).select_from(Post)).one()
-    total_views = db.exec(select(func.count()).select_from(PostView)).one()
+    total_posts = db.exec(select(func.count(Post.id))).one()
 
-    # Top post by view count
-    top_post_query = (
-        select(Post, func.count(PostView.id).label("view_count"))
-        .outerjoin(PostView, Post.id == PostView.post_id)
-        .group_by(Post.id)
-        .order_by(func.count(PostView.id).desc())
+    # Top post by blog visits (all-time)
+    top_blog_query = (
+        select(BlogVisitor.blog_id, func.sum(BlogVisitor.visitor_count).label("view_count"))
+        .group_by(BlogVisitor.blog_id)
+        .order_by(func.sum(BlogVisitor.visitor_count).desc())
         .limit(1)
     )
-    top_post_row = db.exec(top_post_query).first()
+    top_blog_res = db.exec(top_blog_query).first()
     top_post = None
-    if top_post_row:
-        post_obj = top_post_row[0] if isinstance(top_post_row, tuple) else top_post_row
-        top_post = _post_to_read(post_obj).model_dump()
+    if top_blog_res:
+        top_post = {
+            "blog_id": top_blog_res[0],
+            "view_count": top_blog_res[1],
+        }
 
-    # Top tag by frequency
-    top_tag = None
-    all_posts = db.exec(select(Post)).all()
-    tag_counts: dict[str, int] = {}
-    for p in all_posts:
-        for t in (p.tags or []):
-            tag_counts[t] = tag_counts.get(t, 0) + 1
-    if tag_counts:
-        top_tag = max(tag_counts, key=tag_counts.get)
+    # Top focus area
+    from sqlalchemy import text
+    top_focus_query = select(text("unnest(focus_areas) as focus_area, count(*) as count"))\
+        .select_from(Post.__table__)\
+        .group_by(text("focus_area"))\
+        .order_by(text("count DESC"))\
+        .limit(1)
+
+    top_focus_res = db.exec(top_focus_query).first()
+    top_focus_area = top_focus_res[0] if top_focus_res else None
 
     return {
         "total_posts": total_posts,
-        "total_views": total_views,
         "top_post": top_post,
-        "top_tag": top_tag,
+        "top_focus_area": top_focus_area,
     }
 
 
 @router.get("/analytics/top-posts")
-def analytics_top_posts(
-    limit: int = Query(default=10, ge=1, le=50),
+def get_top_posts(
+    limit: int = 10,
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    admin_data: dict = Depends(require_admin)
 ):
     query = (
-        select(Post, func.count(PostView.id).label("view_count"))
-        .outerjoin(PostView, Post.id == PostView.post_id)
+        select(
+            Post.id,
+            Post.title,
+            Post.img_url,
+            Post.published_date,
+            func.coalesce(func.sum(BlogVisitor.visitor_count), 0).label("view_count"),
+        )
+        .join(
+            BlogVisitor,
+            BlogVisitor.blog_id == cast(Post.id, String),
+            isouter=True,
+        )
         .group_by(Post.id)
-        .order_by(func.count(PostView.id).desc())
+        .order_by(func.coalesce(func.sum(BlogVisitor.visitor_count), 0).desc())
         .limit(limit)
     )
     results = db.exec(query).all()
 
-    posts_with_views = []
-    for row in results:
-        post_obj = row[0] if isinstance(row, tuple) else row
-        view_count = row[1] if isinstance(row, tuple) else 0
-        post_data = _post_to_read(post_obj).model_dump()
-        post_data["view_count"] = view_count
-        posts_with_views.append(post_data)
-
-    return posts_with_views
-
-
-@router.get("/analytics/traffic")
-def analytics_traffic(
-    range: str = Query(default="7d", pattern="^(7d|30d)$"),
-    db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
-):
-    days = 7 if range == "7d" else 30
-    since = datetime.utcnow() - timedelta(days=days)
-
-    query = (
-        select(
-            func.date(PostView.viewed_at).label("date"),
-            func.count(PostView.id).label("views"),
-        )
-        .where(PostView.viewed_at >= since)
-        .group_by(func.date(PostView.viewed_at))
-        .order_by(func.date(PostView.viewed_at))
-    )
-    results = db.exec(query).all()
-
     return [
-        {"date": str(row[0]), "views": row[1]}
-        for row in results
+        {
+            "id": str(r[0]),
+            "title": r[1],
+            "img_url": r[2],
+            "published_date": r[3],
+            "view_count": r[4],
+        }
+        for r in results
     ]
 
 
 @router.get("/analytics/tags")
-def analytics_tags(
+def get_analytics_tags(
     db: Session = Depends(get_db),
-    _admin: User = Depends(require_admin),
+    admin_data: dict = Depends(require_admin)
 ):
-    all_posts = db.exec(select(Post)).all()
-    tag_counts: dict[str, int] = {}
-    for p in all_posts:
-        for t in (p.tags or []):
-            tag_counts[t] = tag_counts.get(t, 0) + 1
+    from sqlalchemy import text
+    query = select(text("unnest(focus_areas) as focus_area, count(*) as count"))\
+        .select_from(Post.__table__)\
+        .group_by(text("focus_area"))\
+        .order_by(text("count DESC"))
 
-    sorted_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
-    return [{"tag": tag, "count": count} for tag, count in sorted_tags]
+    results = db.exec(query).all()
+
+    return [
+        {"focus_area": r[0], "count": r[1]}
+        for r in results
+    ]
+
+
+@router.post("/ingest")
+async def trigger_ingest(
+    db: Session = Depends(get_db),
+    admin_data: dict = Depends(require_admin)
+):
+    result = await ingest_posts(db)
+    return result
+
+
+@router.get("/analytics/web-visits-daily")
+def get_web_visits_daily(
+    db: Session = Depends(get_db),
+    admin_data: dict = Depends(require_admin)
+):
+    """Return daily web visitor counts, most recent first."""
+    query = (
+        select(WebVisitor.date, WebVisitor.visitor_count)
+        .order_by(WebVisitor.date.desc())
+    )
+    results = db.exec(query).all()
+    return [{"date": r[0], "count": r[1]} for r in results]
+
+
+@router.get("/analytics/blog-visits-daily")
+def get_blog_visits_daily(
+    db: Session = Depends(get_db),
+    admin_data: dict = Depends(require_admin)
+):
+    """Return daily blog visitor counts aggregated across all blog_ids, most recent first."""
+    query = (
+        select(BlogVisitor.visit_date, func.sum(BlogVisitor.visitor_count).label("count"))
+        .group_by(BlogVisitor.visit_date)
+        .order_by(BlogVisitor.visit_date.desc())
+    )
+    results = db.exec(query).all()
+    return [{"date": r[0], "count": r[1]} for r in results]
+
+
+@router.get("/analytics/blog-visits-by-id")
+def get_blog_visits_by_id(
+    blog_id: str,
+    db: Session = Depends(get_db),
+    admin_data: dict = Depends(require_admin)
+):
+    """Return daily visitor counts for a specific blog_id."""
+    query = (
+        select(BlogVisitor.visit_date, BlogVisitor.visitor_count)
+        .where(BlogVisitor.blog_id == blog_id)
+        .order_by(BlogVisitor.visit_date.desc())
+    )
+    results = db.exec(query).all()
+    return [{"date": r[0], "count": r[1]} for r in results]

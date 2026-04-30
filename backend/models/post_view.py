@@ -1,14 +1,10 @@
-from datetime import datetime
+from sqlmodel import SQLModel, Field
 from typing import Optional
 from uuid import UUID, uuid4
-
-from sqlmodel import SQLModel, Field
-
+from datetime import datetime
 
 class PostView(SQLModel, table=True):
-    __tablename__ = "postview"
-
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    post_id: UUID = Field(foreign_key="post.id")
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    post_id: str
     viewed_at: datetime = Field(default_factory=datetime.utcnow)
     user_agent: Optional[str] = None
