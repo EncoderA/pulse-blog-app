@@ -8,7 +8,6 @@ import {
   FileText,
   Globe,
   Tag,
-  CheckCircle2,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -47,63 +46,11 @@ function formatDate(dateStr: string | null): string {
 }
 
 /** Rough read-time estimate: ~200 words / minute */
-function estimateReadTime(contentLength: number | null): string {
-  if (!contentLength) return "";
-  const minutes = Math.max(1, Math.round(contentLength / 1000));
+function estimateReadTime(text: string | null): string {
+  if (!text) return "";
+  const wordCount = text.trim().split(/\s+/).length;
+  const minutes = Math.max(1, Math.round(wordCount / 200));
   return `${minutes} min read`;
-}
-
-/** Split a pipe-separated or comma-separated tags string */
-function parseTags(tags: string | null): string[] {
-  if (!tags) return [];
-  return tags
-    .split(/[|,]/)
-    .map((t) => t.trim())
-    .filter(Boolean);
-}
-
-/** Split a multi-sentence field into a bullet list */
-function splitSentences(text: string | null): string[] {
-  if (!text) return [];
-  return text
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-// ─── Article section helper ───────────────────────────────────────────────────
-
-function ArticleSection({
-  title,
-  text,
-  asBullets = false,
-}: {
-  title: string;
-  text: string | null;
-  asBullets?: boolean;
-}) {
-  if (!text) return null;
-  const points = asBullets ? splitSentences(text) : null;
-
-  return (
-    <div className="space-y-3">
-      <h2 className="font-heading text-2xl font-semibold tracking-normal text-foreground">
-        {title}
-      </h2>
-      {points ? (
-        <ul className="space-y-3 text-base leading-8 text-muted-foreground">
-          {points.map((point, i) => (
-            <li key={i} className="flex gap-3">
-              <CheckCircle2 className="mt-1 size-5 shrink-0 text-primary" />
-              <span>{point}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-base leading-8 text-muted-foreground">{text}</p>
-      )}
-    </div>
-  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -115,33 +62,16 @@ export default async function NewsDetailPage({
 }) {
   const { id } = await params;
 
-  // Guard: id must be a positive integer
-  const numericId = parseInt(id, 10);
-  if (isNaN(numericId) || numericId <= 0) {
-    notFound();
-  }
-
-  const post = await getPostById(numericId).catch(() => null);
+  // id is a UUID string from the backend
+  const post = await getPostById(id).catch(() => null);
   if (!post) notFound();
 
-  const tags = parseTags(post.Tags);
-  const readTime = estimateReadTime(post.Content_Length);
-
-  // Build article sections from real fields — skip nulls automatically
-  const sections: Array<{ title: string; text: string | null; asBullets?: boolean }> = [
-    { title: "Overview", text: post.Overview },
-    { title: "Background", text: post.Background },
-    { title: "News", text: post.News },
-    { title: "Highlights", text: post.Highlights, asBullets: true },
-    { title: "Impact", text: post.Impact },
-    { title: "Impacts", text: post.Impacts, asBullets: true },
-    { title: "What's Next", text: post.Whats_Next },
-  ];
+  const readTime = estimateReadTime(post.content);
 
   return (
     <>
       {/* Analytics tracker — client component, fire-and-forget */}
-      <BlogVisitTracker id={numericId} />
+      <BlogVisitTracker id={id} />
 
       <article className="min-h-screen w-full bg-background px-4 py-8 text-foreground sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(280px,3fr)]">
@@ -163,25 +93,25 @@ export default async function NewsDetailPage({
 
             {/* Hero */}
             <header className="space-y-5">
-              {post.Focus_Area && (
-                <Badge variant="secondary">{post.Focus_Area}</Badge>
+              {post.category && (
+                <Badge variant="secondary">{post.category}</Badge>
               )}
               <div className="space-y-4">
                 <h1 className="font-heading text-3xl font-bold leading-tight tracking-normal text-foreground sm:text-5xl">
-                  {post.Title ?? "Untitled"}
+                  {post.title ?? "Untitled"}
                 </h1>
-                {post.Short_Summary && (
+                {post.summary && (
                   <p className="max-w-3xl text-base leading-7 text-muted-foreground sm:text-lg">
-                    {post.Short_Summary}
+                    {post.summary}
                   </p>
                 )}
               </div>
 
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                {post.Date && (
+                {post.created_at && (
                   <span className="inline-flex items-center gap-1.5">
                     <CalendarDays className="size-4 text-primary" />
-                    {formatDate(post.Date)}
+                    {formatDate(post.created_at)}
                   </span>
                 )}
                 {readTime && (
@@ -190,9 +120,9 @@ export default async function NewsDetailPage({
                     {readTime}
                   </span>
                 )}
-                {post.Source_Url && (
+                {post.source_urls?.length > 0 && (
                   <a
-                    href={post.Source_Url}
+                    href={post.source_urls[0]}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-primary underline-offset-4 hover:underline"
@@ -204,10 +134,10 @@ export default async function NewsDetailPage({
               </div>
 
               {/* Tags */}
-              {tags.length > 0 && (
+              {post.tags?.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Tag className="size-3.5 text-muted-foreground" />
-                  {tags.map((tag) => (
+                  {post.tags.map((tag) => (
                     <Badge key={tag} variant="outline" className="text-xs">
                       {tag}
                     </Badge>
@@ -218,7 +148,7 @@ export default async function NewsDetailPage({
 
             <Separator />
 
-            {/* Quick Take (static demo cards — kept from original design) */}
+            {/* Quick Take (static demo cards) */}
             <section className="space-y-4">
               <h2 className="font-heading text-xl font-semibold tracking-normal text-foreground">
                 Quick Take
@@ -247,17 +177,17 @@ export default async function NewsDetailPage({
 
             <Separator />
 
-            {/* Dynamic article body from real API fields */}
+            {/* Article body — uses the real `content` field from the backend */}
             <section className="space-y-8">
-              {sections.some((s) => s.text) ? (
-                sections.map((s) => (
-                  <ArticleSection
-                    key={s.title}
-                    title={s.title}
-                    text={s.text}
-                    asBullets={s.asBullets}
-                  />
-                ))
+              {post.content ? (
+                <div className="space-y-3">
+                  <h2 className="font-heading text-2xl font-semibold tracking-normal text-foreground">
+                    Full Story
+                  </h2>
+                  <div className="prose prose-neutral dark:prose-invert max-w-none text-base leading-8 text-muted-foreground whitespace-pre-line">
+                    {post.content}
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl bg-muted/40 p-5 text-sm text-muted-foreground ring-1 ring-border">
                   <FileText className="size-4 shrink-0" />

@@ -1,29 +1,28 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-// ─── Types matching the backend PascalCase schema exactly ────────────────────
+// ─── Types matching the backend schema exactly ────────────────────────────────
+// Backend uses: id (UUID), title, slug, summary, content, cover_image,
+//               source_urls (array), tags (array), category, status,
+//               created_at, updated_at
 
 /** Lightweight shape returned by GET /posts (paginated list) */
 export interface PostSummary {
-  Id: number;
-  Title: string | null;
-  Short_Summary: string | null;
-  Date: string | null;         // ISO datetime string
-  Focus_Area: string | null;
-  Image_Url: string[] | null;
+  id: string;           // UUID
+  title: string;
+  slug: string;
+  summary: string;
+  cover_image: string | null;
+  tags: string[];
+  category: string | null;
+  created_at: string;   // ISO datetime
 }
 
 /** Full shape returned by GET /posts/{id} */
 export interface PostDetail extends PostSummary {
-  Content_Length: number | null;
-  Source_Url: string | null;
-  Tags: string | null;
-  Background: string | null;
-  News: string | null;
-  Highlights: string | null;
-  Impact: string | null;
-  Whats_Next: string | null;
-  Overview: string | null;
-  Impacts: string | null;
+  content: string;
+  source_urls: string[];
+  status: string;
+  updated_at: string;
 }
 
 export interface PaginatedPosts {
@@ -60,13 +59,13 @@ export interface AnalyticsOverview {
 export async function getPosts(params?: {
   page?: number;
   limit?: number;
-  focus_area?: string;
+  category?: string;   // backend param name is "category"
 }): Promise<PaginatedPosts> {
   const url = new URL(`${API_URL}/posts`);
   if (params) {
-    if (params.page)       url.searchParams.set("page",       params.page.toString());
-    if (params.limit)      url.searchParams.set("limit",      params.limit.toString());
-    if (params.focus_area) url.searchParams.set("focus_area", params.focus_area);
+    if (params.page)     url.searchParams.set("page",     params.page.toString());
+    if (params.limit)    url.searchParams.set("limit",    params.limit.toString());
+    if (params.category) url.searchParams.set("category", params.category);
   }
 
   const res = await fetch(url.toString(), { next: { revalidate: 60 } });
@@ -76,7 +75,8 @@ export async function getPosts(params?: {
   return res.json();
 }
 
-export async function getPostById(id: number): Promise<PostDetail | null> {
+/** id is a UUID string, e.g. "3f2504e0-..." */
+export async function getPostById(id: string): Promise<PostDetail | null> {
   const res = await fetch(`${API_URL}/posts/${id}`, { next: { revalidate: 60 } });
   if (!res.ok) {
     if (res.status === 404) return null;

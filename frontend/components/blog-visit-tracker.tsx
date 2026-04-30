@@ -8,7 +8,7 @@ import { API_URL } from "@/lib/api";
  * Rendered as a child of the (Server Component) detail page so the
  * page itself stays server-rendered.
  */
-export function BlogVisitTracker({ id }: { id: number }) {
+export function BlogVisitTracker({ id }: { id: string }) {
   useEffect(() => {
     fetch(`${API_URL}/analytics/blog-visit/${id}`, {
       method: "POST",

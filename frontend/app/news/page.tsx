@@ -45,17 +45,17 @@ function formatDate(dateStr: string | null): string {
 function PaginationBar({
   currentPage,
   totalPages,
-  focusArea,
+  activeCategories,
 }: {
   currentPage: number;
   totalPages: number;
-  focusArea: string[];
+  activeCategories: string[];
 }) {
   if (totalPages <= 1) return null;
 
   function buildHref(page: number) {
     const params = new URLSearchParams();
-    focusArea.forEach((f) => params.append("category", f));
+    activeCategories.forEach((c) => params.append("category", c));
     params.set("page", page.toString());
     return `/news?${params.toString()}`;
   }
@@ -132,26 +132,26 @@ function ErrorCard({ message }: { message: string }) {
 
 function PostCard({ post }: { post: PostSummary }) {
   return (
-    <Card key={post.Id} className="min-h-32 rounded-sm">
+    <Card className="min-h-32 rounded-sm">
       <CardHeader>
         <div className="mb-2 flex items-center justify-between gap-3">
-          {post.Focus_Area ? (
-            <Badge variant="outline">{post.Focus_Area}</Badge>
+          {post.category ? (
+            <Badge variant="outline">{post.category}</Badge>
           ) : (
             <span />
           )}
           <span className="text-xs text-muted-foreground">
-            {formatDate(post.Date)}
+            {formatDate(post.created_at)}
           </span>
         </div>
-        <CardTitle className="line-clamp-2">{post.Title ?? "Untitled"}</CardTitle>
+        <CardTitle className="line-clamp-2">{post.title ?? "Untitled"}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 text-sm leading-6 text-muted-foreground line-clamp-3">
-        {post.Short_Summary ?? ""}
+        {post.summary ?? ""}
       </CardContent>
       <CardFooter>
         <Link
-          href={`/news/${post.Id}`}
+          href={`/news/${post.id}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-primary"
         >
           Read story
@@ -187,11 +187,11 @@ export default async function NewsPage({
       posts = data.posts;
       total = data.total;
     } else {
-      // Browse mode: hit GET /posts with pagination + focus_area filter
+      // Browse mode: hit GET /posts with pagination + category filter
       const data = await getPosts({
         page: currentPage,
         limit: POSTS_PER_PAGE,
-        focus_area: activeCategories[0],
+        category: activeCategories[0], // backend accepts "category" query param
       });
       posts = data.posts;
       total = data.total;
@@ -203,9 +203,9 @@ export default async function NewsPage({
         : "An unexpected error occurred while fetching stories.";
   }
 
-  // Derive available focus areas from this page's results
+  // Derive available categories from results
   const categories = Array.from(
-    new Set(posts.map((p) => p.Focus_Area).filter(Boolean) as string[])
+    new Set(posts.map((p) => p.category).filter(Boolean) as string[])
   ).sort();
 
   const totalPages = Math.max(1, Math.ceil(total / POSTS_PER_PAGE));
@@ -267,7 +267,7 @@ export default async function NewsPage({
             </CardContent>
           </Card>
         ) : (
-          posts.map((post) => <PostCard key={post.Id} post={post} />)
+          posts.map((post) => <PostCard key={post.id} post={post} />)
         )}
       </div>
 
@@ -276,7 +276,7 @@ export default async function NewsPage({
         <PaginationBar
           currentPage={currentPage}
           totalPages={totalPages}
-          focusArea={activeCategories}
+          activeCategories={activeCategories}
         />
       )}
     </div>

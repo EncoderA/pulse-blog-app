@@ -165,25 +165,25 @@ export function HeaderSearch() {
               <CommandGroup heading={`Stories (${results.length})`}>
                 {results.map((post) => (
                   <CommandItem
-                    key={post.Id}
-                    value={`${post.Id} ${post.Title}`}
+                    key={post.id}
+                    value={`${post.id} ${post.title}`}
                     onSelect={() => {
                       setOpen(false)
-                      router.push(`/news/${post.Id}`)
+                      router.push(`/news/${post.id}`)
                     }}
                     className="gap-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">
-                        {post.Title ?? "Untitled"}
+                        {post.title ?? "Untitled"}
                       </div>
                       <div className="flex items-center gap-2 truncate text-xs text-muted-foreground">
-                        {post.Focus_Area && (
+                        {post.category && (
                           <span className="rounded-full bg-muted px-1.5 py-0.5">
-                            {post.Focus_Area}
+                            {post.category}
                           </span>
                         )}
-                        {post.Date && <span>{formatDate(post.Date)}</span>}
+                        {post.created_at && <span>{formatDate(post.created_at)}</span>}
                       </div>
                     </div>
                   </CommandItem>
