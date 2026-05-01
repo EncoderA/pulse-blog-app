@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 
@@ -21,6 +21,11 @@ function isTextInput(target: EventTarget | null) {
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const toggleTheme = useCallback(() => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark")
@@ -53,9 +58,14 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label="Toggle theme"
       title="Toggle theme (D)"
-      suppressHydrationWarning
     >
-      {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      {!mounted ? (
+        <span className="size-4" />
+      ) : isDark ? (
+        <Sun className="size-4" />
+      ) : (
+        <Moon className="size-4" />
+      )}
     </Button>
   )
 }

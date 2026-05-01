@@ -56,6 +56,33 @@ export interface AnalyticsOverview {
 
 // ─── Public post API ──────────────────────────────────────────────────────────
 
+export function mapPostSummary(p: any): PostSummary {
+  return {
+    Id: p.id,
+    Title: p.title,
+    Short_Summary: p.summary,
+    Date: p.created_at,
+    Focus_Area: p.category,
+    Image_Url: p.cover_image ? [p.cover_image] : null,
+  };
+}
+
+function mapPostDetail(p: any): PostDetail {
+  return {
+    ...mapPostSummary(p),
+    Content_Length: p.content?.length || 0,
+    Source_Url: p.source_urls?.[0] || null,
+    Tags: p.tags?.join(", ") || null,
+    Overview: p.content,
+    Background: null,
+    News: null,
+    Highlights: null,
+    Impact: null,
+    Whats_Next: null,
+    Impacts: null,
+  };
+}
+
 export async function getPosts(params?: {
   page?: number;
   limit?: number;
@@ -63,8 +90,8 @@ export async function getPosts(params?: {
 }): Promise<PaginatedPosts> {
   const url = new URL(`${API_URL}/posts`);
   if (params) {
-    if (params.page)     url.searchParams.set("page",     params.page.toString());
-    if (params.limit)    url.searchParams.set("limit",    params.limit.toString());
+    if (params.page) url.searchParams.set("page", params.page.toString());
+    if (params.limit) url.searchParams.set("limit", params.limit.toString());
     if (params.category) url.searchParams.set("category", params.category);
   }
 
@@ -72,17 +99,21 @@ export async function getPosts(params?: {
   if (!res.ok) {
     throw new Error(`Failed to fetch posts: ${res.status} ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  return {
+    ...data,
+    posts: data.posts.map(mapPostSummary),
+  };
 }
 
-/** id is a UUID string, e.g. "3f2504e0-..." */
 export async function getPostById(id: string): Promise<PostDetail | null> {
   const res = await fetch(`${API_URL}/posts/${id}`, { next: { revalidate: 60 } });
   if (!res.ok) {
     if (res.status === 404) return null;
     throw new Error(`Failed to fetch post ${id}: ${res.status} ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  return mapPostDetail(data);
 }
 
 export async function searchPosts(q: string): Promise<PaginatedPosts> {
@@ -92,7 +123,11 @@ export async function searchPosts(q: string): Promise<PaginatedPosts> {
   if (!res.ok) {
     throw new Error(`Search failed: ${res.status} ${res.statusText}`);
   }
-  return res.json();
+  const data = await res.json();
+  return {
+    ...data,
+    posts: data.posts.map(mapPostSummary),
+  };
 }
 
 // ─── Admin API ────────────────────────────────────────────────────────────────

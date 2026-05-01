@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mapPostSummary } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -33,7 +34,10 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json({
+      ...data,
+      posts: data.posts.map(mapPostSummary)
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
