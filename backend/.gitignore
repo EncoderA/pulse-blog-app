@@ -59,6 +59,7 @@ coverage.xml
 .idea/
 *.swp
 *.swo
+.env*
 
 # OS generated files
 .DS_Store
