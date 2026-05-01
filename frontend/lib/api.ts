@@ -58,28 +58,24 @@ export interface AnalyticsOverview {
 
 export function mapPostSummary(p: any): PostSummary {
   return {
-    Id: p.id,
-    Title: p.title,
-    Short_Summary: p.summary,
-    Date: p.created_at,
-    Focus_Area: p.category,
-    Image_Url: p.cover_image ? [p.cover_image] : null,
+    id: p.id,
+    title: p.title,
+    slug: p.slug || "",
+    summary: p.summary || "",
+    cover_image: p.cover_image || null,
+    tags: p.tags || [],
+    category: p.category || null,
+    created_at: p.created_at,
   };
 }
 
 function mapPostDetail(p: any): PostDetail {
   return {
     ...mapPostSummary(p),
-    Content_Length: p.content?.length || 0,
-    Source_Url: p.source_urls?.[0] || null,
-    Tags: p.tags?.join(", ") || null,
-    Overview: p.content,
-    Background: null,
-    News: null,
-    Highlights: null,
-    Impact: null,
-    Whats_Next: null,
-    Impacts: null,
+    content: p.content || "",
+    source_urls: p.source_urls || [],
+    status: p.status || "",
+    updated_at: p.updated_at || p.created_at,
   };
 }
 
